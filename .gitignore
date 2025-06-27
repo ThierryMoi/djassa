@@ -1,0 +1,47 @@
+# Python cache and environment
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+*.venv/
+env/
+venv/
+ENV/
+.venv/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# Docker files
+*.dockerignore
+docker-compose.override.yml
+
+# Pytest cache
+.pytest_cache/
+
+# mypy cache
+.mypy_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+
+# VS Code settings
+.vscode/
+
+# macOS files
+.DS_Store
