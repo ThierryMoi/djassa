@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request, status, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -33,3 +34,8 @@ async def update_profile(
     if not user_id:
         raise HTTPException(status_code=401, detail="Missing user ID")
     return await update_user(db, user_id, user_update)
+
+
+@router.get("/health")
+async def health_check():
+    return JSONResponse(status_code=200, content={"status": "ok"})

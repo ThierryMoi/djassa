@@ -1,0 +1,20 @@
+{
+  "service": {
+    "name": "users",
+    "address": "users", 
+    "tags": [
+      "traefik.enable=true",
+      "traefik.http.routers.users.rule=PathPrefix(`/api/users`)",
+      "traefik.http.routers.users.entrypoints=web",
+      "traefik.http.routers.users.middlewares=auth,strip-users",
+      "traefik.http.middlewares.strip-users.stripPrefix.prefixes=/api/users",
+      "traefik.http.services.users.loadbalancer.server.port=8000"
+    ],
+    "port": 8000,
+    "check": {
+      "http": "http://users:8000/v1/health",
+      "interval": "10s",
+      "timeout": "1s"
+    }
+  }
+}

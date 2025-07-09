@@ -2,21 +2,31 @@ version: "3.8"
 
 services:
 
+  consul:
+    image: hashicorp/consul:1.16
+    command: agent -server -bootstrap-expect=1 -client=0.0.0.0 -ui
+    ports:
+      - "8500:8500"      # UI et API HTTP Consul
+      - "8600:8600/udp"  # DNS pour service discovery
+    volumes:
+      - consul_data:/consul/data
+    networks:
+      - backend
+
   traefik:
     image: traefik:v2.11
     command:
       - "--api.insecure=true"
-      - "--providers.docker=true"
+      - "--providers.consulcatalog.endpoint.address=consul:8500"
       - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
       - "8080:8080"  # Dashboard Traefik
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    depends_on:
+      - consul
     networks:
       - backend
 
-  # ✅ Keycloak stateful avec PostgreSQL
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.1
     command: start-dev
@@ -47,7 +57,6 @@ services:
     networks:
       - backend
 
-  # ✅ DB utilisateurs pour le microservice users
   postgres:
     image: postgres:15
     restart: always
@@ -91,53 +100,9 @@ services:
     networks:
       - backend
 
-
-
-
-  # ✅ Microservice auth-proxy
+  # Service auth-proxy principal
   auth-proxy:
     build: ./auth-proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.auth-proxy.rule=PathPrefix(`/api/auth`)"
-      - "traefik.http.routers.auth-proxy.entrypoints=web"
-      - "traefik.http.services.auth-proxy.loadbalancer.server.port=8000"
-
-      # 🔁 On définit ici le middleware auth directement dans ce service
-      - "traefik.http.middlewares.auth.forwardauth.address=http://auth-proxy:8000/v1/validate"
-      - "traefik.http.middlewares.auth.forwardauth.trustforwardheader=true"
-      - "traefik.http.middlewares.auth.forwardauth.authResponseHeaders=X-User-Id,X-User-Username,X-User-Email"
-    depends_on:
-      - keycloak
-      - postgres
-      - vault
-      - vault-init
-    environment:
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: root
-      keycloak_url: http://keycloak:8080
-      postgres_db: users_db
-      realm: djassa
-      audience: djassa-client
-      user_service_url: http://users:8000     
-    networks:
-      - backend
-
-  # ✅ Microservice users
-  users:
-    build: ./users
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.users.rule=PathPrefix(`/api/users`)"
-      - "traefik.http.routers.users.entrypoints=web"
-      - "traefik.http.routers.users.middlewares=auth@docker,strip-users@docker"
-      - "traefik.http.middlewares.strip-users.stripPrefix.prefixes=/api/users"
-      - "traefik.http.services.users.loadbalancer.server.port=8000"
-    depends_on:
-      - keycloak
-      - postgres
-      - vault
-      - vault-init
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: root
@@ -146,7 +111,56 @@ services:
       realm: djassa
       audience: djassa-client
       user_service_url: http://users:8000
-      
+    networks:
+      - backend
+    depends_on:
+      - keycloak
+      - postgres
+      - vault
+      - vault-init
+      - consul
+
+  # Agent Consul client pour auth-proxy (sidecar)
+  consul-agent-auth-proxy:
+    image: hashicorp/consul:1.16
+    command: agent -retry-join=consul -client=0.0.0.0 -node=auth-proxy-agent -bind=0.0.0.0 -config-dir=/consul/config
+    depends_on:
+      - consul
+      - auth-proxy
+    volumes:
+      - ./consul-config/auth-proxy.json:/consul/config/auth-proxy.json:ro
+    networks:
+      - backend
+
+  # Service users principal
+  users:
+    build: ./users
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+      keycloak_url: http://keycloak:8080
+      postgres_db: users_db
+      realm: djassa
+      audience: djassa-client
+      user_service_url: http://users:8000
+    networks:
+      - backend
+    depends_on:
+      - keycloak
+      - postgres
+      - vault
+      - vault-init
+      - consul
+
+  # Agent Consul client pour users (sidecar)
+  consul-agent-users:
+    image: hashicorp/consul:1.16
+    command: agent -retry-join=consul -client=0.0.0.0 -node=users-agent -bind=0.0.0.0 -config-dir=/consul/config
+    depends_on:
+      - consul
+      - users
+    volumes:
+      - ./consul-config/users.json:/consul/config/users.json:ro
     networks:
       - backend
 
@@ -157,3 +171,4 @@ volumes:
   pgdata:
   keycloak_pgdata:
   vault_data:
+  consul_data:

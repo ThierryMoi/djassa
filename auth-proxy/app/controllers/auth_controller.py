@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Security, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.services.auth_service import AuthService
 from app.core.config import settings
+from starlette.responses import JSONResponse
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
@@ -38,3 +39,7 @@ async def validate_token(
 
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
+
+@router.get("/health")
+async def health_check():
+    return JSONResponse(status_code=200, content={"status": "ok"})

@@ -1,0 +1,23 @@
+{
+  "service": {
+    "name": "auth-proxy",
+    "address": "auth-proxy", 
+
+    "port": 8000,
+    "tags": [
+        
+    "traefik.enable=true",
+    "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)",
+    "traefik.http.routers.auth.entrypoints=web",
+    "traefik.http.services.auth.loadbalancer.server.port=8000",
+    "traefik.http.middlewares.auth.forwardauth.address=http://auth-proxy:8000/v1/validate",
+    "traefik.http.middlewares.auth.forwardauth.trustforwardheader=true",
+    "traefik.http.middlewares.auth.forwardauth.authResponseHeaders=X-User-Id,X-User-Username,X-User-Email"
+  ],
+    "check": {
+      "http": "http://auth-proxy:8000/v1/health",
+      "interval": "10s",
+      "timeout": "1s"
+    }
+  }
+}
